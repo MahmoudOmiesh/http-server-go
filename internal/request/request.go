@@ -18,11 +18,56 @@ type RequestLine struct {
 	Method        string
 }
 
+func (r *RequestLine) isValidHttpVersion() bool {
+	return r.HttpVersion == "HTTP/1.1"
+}
+
+func (r *RequestLine) isValidRequestTarget() bool {
+	for _, r := range r.RequestTarget {
+		if unicode.IsSpace(r) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (r *RequestLine) isValidMethod() bool {
+	for _, r := range r.Method {
+		if unicode.IsLower(r) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (r *RequestLine) isValid() (bool, error) {
+	if !r.isValidHttpVersion() {
+		return false, ErrorInvalidHttpVersion
+	}
+	if !r.isValidRequestTarget() {
+		return false, ErrorInvalidRequestTarget
+	}
+	if !r.isValidMethod() {
+		return false, ErrorInvalidMethod
+	}
+
+	return true, nil
+}
+
+var SEPARATOR = "\r\n"
+var ErrorInvalidRequest = errors.New("request is invalid")
+var ErrorInvalidRequestLine = errors.New("request line is invalid")
+var ErrorInvalidHttpVersion = errors.New("http version is not supported")
+var ErrorInvalidRequestTarget = errors.New("request target is invalid")
+var ErrorInvalidMethod = errors.New("method is invalid")
+
 func RequestFromReader(reader io.Reader) (*Request, error) {
 	requestBytes, err := io.ReadAll(reader)
 
 	if err != nil {
-		log.Fatal("couldn't read request", err)
+		log.Fatal("unable to read io.ReadAll", err)
 	}
 
 	requestString := string(requestBytes)
@@ -38,80 +83,30 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 }
 
 func parseRequestLine(requestString string) (*RequestLine, error) {
-	lines := strings.Split(requestString, "\r\n")
+	lines := strings.Split(requestString, SEPARATOR)
 
 	if len(lines) == 0 {
-		return nil, errors.New("request string is invalid")
+		return nil, ErrorInvalidRequest
 	}
 
 	requestLineString := lines[0]
 	requestLineParts := strings.Split(requestLineString, " ")
 
 	if len(requestLineParts) != 3 {
-		return nil, errors.New("request line is invalid")
-	}
-
-	method, err := parseRequestLineMethod(requestLineParts[0])
-	if err != nil {
-		return nil, err
-	}
-
-	target, err := parseRequestLineTarget(requestLineParts[1])
-	if err != nil {
-		return nil, err
-	}
-
-	version, err := parseRequestLineVersion(requestLineParts[2])
-	if err != nil {
-		return nil, err
+		return nil, ErrorInvalidRequestLine
 	}
 
 	requestLine := RequestLine{
-		Method:        method,
-		RequestTarget: target,
-		HttpVersion:   version,
+		Method:        requestLineParts[0],
+		RequestTarget: requestLineParts[1],
+		HttpVersion:   requestLineParts[2],
+	}
+
+	isValid, err := requestLine.isValid()
+
+	if !isValid {
+		return nil, err
 	}
 
 	return &requestLine, nil
-}
-
-func parseRequestLineMethod(methodString string) (string, error) {
-	for _, r := range methodString {
-		if !unicode.IsUpper(r) {
-			return "", errors.New("method has lower case letter")
-		}
-	}
-
-	return methodString, nil
-}
-
-func parseRequestLineTarget(targetString string) (string, error) {
-	for _, r := range targetString {
-		if unicode.IsSpace(r) {
-			return "", errors.New("request target has spaces")
-		}
-	}
-
-	return targetString, nil
-}
-
-func parseRequestLineVersion(versionString string) (string, error) {
-	versionParts := strings.Split(versionString, "/")
-
-	if len(versionParts) != 2 {
-		return "", errors.New("invalid version string")
-	}
-
-	httpName := versionParts[0]
-	httpVersion := versionParts[1]
-
-	if httpName != "HTTP" {
-		return "", errors.New("invalid http name")
-	}
-
-	if len(httpVersion) != 3 || !unicode.IsDigit(rune(httpVersion[0])) || !unicode.IsDigit(rune(httpVersion[2])) || httpVersion[1] != '.' {
-		return "", errors.New("invalid http version")
-	}
-
-	return httpVersion, nil
 }
