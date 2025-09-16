@@ -58,9 +58,11 @@ func main() {
 		con, err := listener.Accept()
 
 		if err != nil {
-			log.Fatal("couldn't accept collection", err)
+			log.Fatal("conntection refused", err)
 			break
 		}
+
+		log.Print("connection accepted")
 
 		linesCh := getLinesChannel(con)
 
