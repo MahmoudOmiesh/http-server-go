@@ -39,10 +39,13 @@ func main() {
 		fmt.Printf("- Target: %s\n", reqeust.RequestLine.RequestTarget)
 		fmt.Printf("- Version: %s\n", reqeust.RequestLine.HttpVersion)
 
-		// fmt.Println("Headers:")
-		// for key, value := range reqeust.Headers.headers {
-		// 	fmt.Printf("- %s: %s\n", key, value)
-		// }
+		fmt.Println("Headers:")
+		reqeust.Headers.Loop(func(key string, value string) {
+			fmt.Printf("- %s: %s\n", key, value)
+		})
+
+		fmt.Println("Body:")
+		fmt.Println(string(reqeust.Body))
 	}
 
 }

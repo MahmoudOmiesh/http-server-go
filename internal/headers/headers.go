@@ -18,6 +18,12 @@ func (h Headers) Get(key string) (string, bool) {
 	return value, exists
 }
 
+func (h Headers) Loop(cb func(string, string)) {
+	for key, value := range h.headers {
+		cb(key, value)
+	}
+}
+
 func NewHeaders() Headers {
 	return Headers{
 		headers: make(map[string]string),
