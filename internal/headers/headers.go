@@ -7,10 +7,21 @@ import (
 	"strings"
 )
 
-type Headers map[string]string
+type Headers struct {
+	headers map[string]string
+}
+
+func (h Headers) Get(key string) (string, bool) {
+	keyLowerCase := strings.ToLower(key)
+	value, exists := h.headers[keyLowerCase]
+
+	return value, exists
+}
 
 func NewHeaders() Headers {
-	return Headers{}
+	return Headers{
+		headers: make(map[string]string),
+	}
 }
 
 const SEPARATOR = "\r\n"
@@ -73,12 +84,12 @@ func (h Headers) Parse(data []byte) (int, bool, error) {
 			return 0, false, err
 		}
 
-		value, exists := h[fieldName]
+		value, exists := h.headers[fieldName]
 
 		if exists {
-			h[fieldName] = value + "," + fieldValue
+			h.headers[fieldName] = value + "," + fieldValue
 		} else {
-			h[fieldName] = fieldValue
+			h.headers[fieldName] = fieldValue
 		}
 
 		readBytes += separatorIndex + len(SEPARATOR)
