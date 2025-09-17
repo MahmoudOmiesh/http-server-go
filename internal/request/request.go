@@ -3,6 +3,7 @@ package request
 import (
 	"bytes"
 	"errors"
+	"http-server/internal/headers"
 	"io"
 	"unicode"
 )
@@ -19,8 +20,9 @@ var ErrorInvalidMethod = errors.New("method is invalid")
 type RequestState string
 
 const (
-	RequestStateInit RequestState = "initialized"
-	RequestStateDone RequestState = "done"
+	RequestStateInit    RequestState = "initialized"
+	ReqeustStateHeaders RequestState = "headers"
+	RequestStateDone    RequestState = "done"
 )
 
 type RequestLine struct {
@@ -31,6 +33,7 @@ type RequestLine struct {
 
 type Request struct {
 	RequestLine RequestLine
+	Headers     headers.Headers
 	state       RequestState
 }
 
@@ -96,8 +99,25 @@ outer:
 			}
 
 			r.RequestLine = *requestLine
-			r.state = RequestStateDone
+			r.state = ReqeustStateHeaders
 			readBytes += bytesConsumed
+
+		case ReqeustStateHeaders:
+			bytesConsumed, done, err := r.Headers.Parse(currentData)
+
+			if err != nil {
+				return 0, err
+			}
+
+			if bytesConsumed == 0 {
+				break outer
+			}
+
+			readBytes += bytesConsumed
+
+			if done {
+				r.state = RequestStateDone
+			}
 
 		case RequestStateDone:
 			break outer
@@ -116,7 +136,8 @@ func (r *Request) done() bool {
 
 func newRequest() *Request {
 	return &Request{
-		state: RequestStateInit,
+		state:   RequestStateInit,
+		Headers: headers.NewHeaders(),
 	}
 }
 
