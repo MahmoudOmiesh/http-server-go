@@ -73,27 +73,41 @@ func (r *RequestLine) isValid() (bool, error) {
 }
 
 func (r *Request) parse(data []byte) (int, error) {
-	if r.state == RequestStateDone {
-		return 0, errors.New("parsing a request after it is done")
-	}
+	readBytes := 0
 
-	if r.state == RequestStateInit {
-		requestLine, bytesConsumed, err := parseRequestLine(data)
+outer:
+	for {
+		currentData := data[readBytes:]
 
-		if err != nil {
-			return 0, err
+		if len(currentData) == 0 {
+			break outer
 		}
 
-		if bytesConsumed == 0 {
-			return 0, nil
-		}
+		switch r.state {
+		case RequestStateInit:
+			requestLine, bytesConsumed, err := parseRequestLine(currentData)
 
-		r.RequestLine = *requestLine
-		r.state = RequestStateDone
-		return bytesConsumed, nil
+			if err != nil {
+				return 0, err
+			}
+
+			if bytesConsumed == 0 {
+				break outer
+			}
+
+			r.RequestLine = *requestLine
+			r.state = RequestStateDone
+			readBytes += bytesConsumed
+
+		case RequestStateDone:
+			break outer
+
+		default:
+			panic("shouldn't really happend")
+		}
 	}
 
-	return 0, errors.New("unknown request state")
+	return readBytes, nil
 }
 
 func (r *Request) done() bool {
