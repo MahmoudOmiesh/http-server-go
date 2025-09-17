@@ -73,7 +73,14 @@ func (h Headers) Parse(data []byte) (int, bool, error) {
 			return 0, false, err
 		}
 
-		h[fieldName] = fieldValue
+		value, exists := h[fieldName]
+
+		if exists {
+			h[fieldName] = value + "," + fieldValue
+		} else {
+			h[fieldName] = fieldValue
+		}
+
 		readBytes += separatorIndex + len(SEPARATOR)
 	}
 
