@@ -9,18 +9,18 @@ import (
 type StatusCode int
 
 const (
-	StatusOk              StatusCode = 200
-	StatusCodeBadRequest  StatusCode = 400
-	StatusCodeServerError StatusCode = 500
+	StatusOk                  StatusCode = 200
+	StatusBadRequest          StatusCode = 400
+	StatusInternalServerError StatusCode = 500
 )
 
 func getStatusLine(statusCode StatusCode) []byte {
 	switch statusCode {
 	case StatusOk:
 		return []byte("HTTP/1.1 200 OK\r\n")
-	case StatusCodeBadRequest:
+	case StatusBadRequest:
 		return []byte("HTTP/1.1 400 Bad Request\r\n")
-	case StatusCodeServerError:
+	case StatusInternalServerError:
 		return []byte("HTTP/1.1 500 Internal Server Error\r\n")
 	default:
 		return fmt.Appendf([]byte("HTTP/1.1"), " %d \r\n", statusCode)
@@ -69,4 +69,10 @@ func WriteHeaders(w io.Writer, headers headers.Headers) error {
 	}
 
 	return foundErr
+}
+
+func WriteBody(w io.Writer, body []byte) error {
+	_, err := fmt.Fprint(w, string(body))
+
+	return err
 }

@@ -79,6 +79,11 @@ func (r *RequestLine) isValid() (bool, error) {
 	return true, nil
 }
 
+func (r *Request) hasBody() bool {
+	len := getInt(&r.Headers, "content-length", 0)
+	return len > 0
+}
+
 func (r *Request) parse(data []byte) (int, error) {
 	readBytes := 0
 
@@ -120,7 +125,11 @@ outer:
 			readBytes += bytesConsumed
 
 			if done {
-				r.state = RequestStateBody
+				if r.hasBody() {
+					r.state = RequestStateBody
+				} else {
+					r.state = RequestStateDone
+				}
 			}
 
 		case RequestStateBody:
@@ -176,11 +185,6 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		numBytesRead, err := reader.Read(buf[readToIndex:])
 
 		if err != nil {
-			if err == io.EOF {
-				request.state = RequestStateDone
-				break
-			}
-
 			return nil, err
 		}
 
@@ -194,12 +198,6 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 		copy(buf, buf[numBytesParsed:readToIndex])
 		readToIndex -= numBytesParsed
-	}
-
-	contentLen := getInt(&request.Headers, "content-length", 0)
-
-	if contentLen != len(request.Body) {
-		return nil, ErrorContentLengthMismatch
 	}
 
 	return request, nil

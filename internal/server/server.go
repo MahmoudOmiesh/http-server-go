@@ -1,32 +1,44 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
+	"http-server/internal/request"
 	"http-server/internal/response"
+	"io"
 	"net"
 	"sync/atomic"
 )
 
+type HandlerError struct {
+	Code    response.StatusCode
+	Message string
+}
+
+type Handler func(w io.Writer, req *request.Request) *HandlerError
+
 type Server struct {
+	handler  Handler
 	listener net.Listener
 	isClosed atomic.Bool
 }
 
-func newServer(l net.Listener) *Server {
+func newServer(h Handler, l net.Listener) *Server {
 	return &Server{
+		handler:  h,
 		listener: l,
 		isClosed: atomic.Bool{},
 	}
 }
 
-func Serve(port uint16) (*Server, error) {
+func Serve(port uint16, h Handler) (*Server, error) {
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 
 	if err != nil {
 		return nil, err
 	}
 
-	server := newServer(l)
+	server := newServer(h, l)
 
 	go server.listen()
 
@@ -63,17 +75,38 @@ func (s *Server) listen() {
 func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 
-	err := response.WriteStatusLine(conn, response.StatusOk)
+	request, err := request.RequestFromReader(conn)
 
 	if err != nil {
+		handlerError := MakeHandlerError(response.StatusBadRequest, "bad request\n")
+		handlerError.write(conn)
 		return
 	}
 
-	defaultHeaders := response.GetDefaultHeaders(0)
+	buf := bytes.NewBuffer([]byte{})
+	handlerError := s.handler(buf, request)
 
-	err = response.WriteHeaders(conn, defaultHeaders)
-
-	if err != nil {
+	if handlerError != nil {
+		handlerError.write(conn)
 		return
 	}
+
+	response.WriteStatusLine(conn, response.StatusOk)
+	headers := response.GetDefaultHeaders(buf.Len())
+	response.WriteHeaders(conn, headers)
+	response.WriteBody(conn, buf.Bytes())
+}
+
+func MakeHandlerError(code response.StatusCode, msg string) *HandlerError {
+	return &HandlerError{
+		Code:    code,
+		Message: msg,
+	}
+}
+
+func (h *HandlerError) write(w io.Writer) {
+	response.WriteStatusLine(w, h.Code)
+	headers := response.GetDefaultHeaders(len(h.Message))
+	response.WriteHeaders(w, headers)
+	response.WriteBody(w, []byte(h.Message))
 }
