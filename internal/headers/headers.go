@@ -3,6 +3,7 @@ package headers
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -56,17 +57,20 @@ func (h *Headers) Parse(data []byte) (int, bool, error) {
 }
 
 func (h *Headers) Get(key string) (string, bool) {
-	keyLowerCase := strings.ToLower(key)
-	value, exists := h.headers[keyLowerCase]
+	value, exists := h.headers[strings.ToLower(key)]
 
 	return value, exists
 }
 
 func (h *Headers) Set(key string, value string) {
-	if prevValue, exists := h.Get(key); exists {
-		h.headers[key] = prevValue + "," + value
+	parsedKey := strings.ToLower(key)
+
+	prev, exists := h.headers[parsedKey]
+
+	if exists {
+		h.headers[parsedKey] = fmt.Sprintf("%s,%s", prev, value)
 	} else {
-		h.headers[key] = value
+		h.headers[parsedKey] = value
 	}
 }
 
