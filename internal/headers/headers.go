@@ -11,19 +11,6 @@ type Headers struct {
 	headers map[string]string
 }
 
-func (h Headers) Get(key string) (string, bool) {
-	keyLowerCase := strings.ToLower(key)
-	value, exists := h.headers[keyLowerCase]
-
-	return value, exists
-}
-
-func (h Headers) Loop(cb func(string, string)) {
-	for key, value := range h.headers {
-		cb(key, value)
-	}
-}
-
 func NewHeaders() Headers {
 	return Headers{
 		headers: make(map[string]string),
@@ -37,36 +24,7 @@ var (
 	ErrorInvalidFieldName = errors.New("invalid field name")
 )
 
-func parseFieldName(fieldName []byte) (string, error) {
-	re := regexp.MustCompile("^[A-Za-z0-9!#$%&'*+\\-.\\^_`|~]+$")
-	fieldNameStr := string(fieldName)
-
-	if !re.MatchString(fieldNameStr) {
-		return "", ErrorInvalidFieldName
-	}
-
-	return strings.ToLower(fieldNameStr), nil
-}
-
-func parseHeader(fieldLine []byte) (string, string, error) {
-	fieldLineParts := bytes.SplitN(fieldLine, []byte(":"), 2)
-
-	if len(fieldLineParts) != 2 {
-		return "", "", ErrorInvalidFieldLine
-	}
-
-	fieldName, err := parseFieldName(fieldLineParts[0])
-
-	if err != nil {
-		return "", "", err
-	}
-
-	fieldValue := bytes.TrimSpace(fieldLineParts[1])
-
-	return string(fieldName), string(fieldValue), nil
-}
-
-func (h Headers) Parse(data []byte) (int, bool, error) {
+func (h *Headers) Parse(data []byte) (int, bool, error) {
 	readBytes := 0
 	done := false
 
@@ -90,16 +48,59 @@ func (h Headers) Parse(data []byte) (int, bool, error) {
 			return 0, false, err
 		}
 
-		value, exists := h.headers[fieldName]
-
-		if exists {
-			h.headers[fieldName] = value + "," + fieldValue
-		} else {
-			h.headers[fieldName] = fieldValue
-		}
-
+		h.Set(fieldName, fieldValue)
 		readBytes += separatorIndex + len(SEPARATOR)
 	}
 
 	return readBytes, done, nil
+}
+
+func (h *Headers) Get(key string) (string, bool) {
+	keyLowerCase := strings.ToLower(key)
+	value, exists := h.headers[keyLowerCase]
+
+	return value, exists
+}
+
+func (h *Headers) Set(key string, value string) {
+	if prevValue, exists := h.Get(key); exists {
+		h.headers[key] = prevValue + "," + value
+	} else {
+		h.headers[key] = value
+	}
+}
+
+func (h *Headers) ForEach(cb func(string, string)) {
+	for key, value := range h.headers {
+		cb(key, value)
+	}
+}
+
+func parseHeader(fieldLine []byte) (string, string, error) {
+	fieldLineParts := bytes.SplitN(fieldLine, []byte(":"), 2)
+
+	if len(fieldLineParts) != 2 {
+		return "", "", ErrorInvalidFieldLine
+	}
+
+	fieldName, err := parseFieldName(fieldLineParts[0])
+
+	if err != nil {
+		return "", "", err
+	}
+
+	fieldValue := bytes.TrimSpace(fieldLineParts[1])
+
+	return string(fieldName), string(fieldValue), nil
+}
+
+func parseFieldName(fieldName []byte) (string, error) {
+	re := regexp.MustCompile("^[A-Za-z0-9!#$%&'*+\\-.\\^_`|~]+$")
+	fieldNameStr := string(fieldName)
+
+	if !re.MatchString(fieldNameStr) {
+		return "", ErrorInvalidFieldName
+	}
+
+	return strings.ToLower(fieldNameStr), nil
 }

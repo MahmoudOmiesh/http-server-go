@@ -17,7 +17,6 @@ var ErrorInvalidRequestLine = errors.New("request line is invalid")
 var ErrorInvalidHttpVersion = errors.New("http version is not supported")
 var ErrorInvalidRequestTarget = errors.New("request target is invalid")
 var ErrorInvalidMethod = errors.New("method is invalid")
-var ErrorInvalidContentLength = errors.New("content length isn't a number")
 var ErrorContentLengthMismatch = errors.New("body size isn't the same as content length")
 
 type RequestState string
@@ -125,11 +124,7 @@ outer:
 			}
 
 		case RequestStateBody:
-			contentLen, err := getInt(&r.Headers, "content-length", 0)
-
-			if err != nil {
-				return 0, ErrorInvalidContentLength
-			}
+			contentLen := getInt(&r.Headers, "content-length", 0)
 
 			r.Body = append(r.Body, currentData...)
 			readBytes += len(currentData)
@@ -201,11 +196,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		readToIndex -= numBytesParsed
 	}
 
-	contentLen, err := getInt(&request.Headers, "content-length", 0)
-
-	if err != nil {
-		return nil, err
-	}
+	contentLen := getInt(&request.Headers, "content-length", 0)
 
 	if contentLen != len(request.Body) {
 		return nil, ErrorContentLengthMismatch
@@ -245,18 +236,18 @@ func parseRequestLine(request []byte) (*RequestLine, int, error) {
 	return &requestLine, readBytes, nil
 }
 
-func getInt(heads *headers.Headers, key string, defaultValue int) (int, error) {
+func getInt(heads *headers.Headers, key string, defaultValue int) int {
 	value, exists := heads.Get(key)
 
 	if !exists {
-		return defaultValue, nil
+		return defaultValue
 	}
 
 	valueAsInt, err := strconv.Atoi(value)
 
 	if err != nil {
-		return 0, err
+		return 0
 	}
 
-	return valueAsInt, nil
+	return valueAsInt
 }

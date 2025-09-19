@@ -40,7 +40,7 @@ func main() {
 		fmt.Printf("- Version: %s\n", reqeust.RequestLine.HttpVersion)
 
 		fmt.Println("Headers:")
-		reqeust.Headers.Loop(func(key string, value string) {
+		reqeust.Headers.ForEach(func(key string, value string) {
 			fmt.Printf("- %s: %s\n", key, value)
 		})
 
