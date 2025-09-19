@@ -1,11 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"http-server/internal/request"
 	"http-server/internal/response"
 	"http-server/internal/server"
-	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -15,17 +13,22 @@ import (
 const port = 42069
 
 func main() {
-	server, err := server.Serve(port, func(w io.Writer, req *request.Request) *server.HandlerError {
+	server, err := server.Serve(port, func(w *response.Writer, req *request.Request) {
+		var msg []byte
 		switch req.RequestLine.RequestTarget {
 		case "/yourproblem":
-			return server.MakeHandlerError(response.StatusBadRequest, "Your problem is not my problem\n")
+			msg = respone400()
 		case "/myproblem":
-			return server.MakeHandlerError(response.StatusInternalServerError, "Woopsie, my bad\n")
+			msg = respone500()
 		default:
-			fmt.Fprint(w, "All good, frfr\n")
+			msg = respone200()
 		}
 
-		return nil
+		w.WriteStatusLine(response.StatusBadRequest)
+		headers := response.GetDefaultHeaders(len(msg))
+		headers.Replace("content-type", "text/html")
+		w.WriteHeaders(headers)
+		w.WriteBody(msg)
 	})
 
 	if err != nil {
@@ -38,4 +41,40 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 	log.Println("Server gracefully stopped")
+}
+
+func respone200() []byte {
+	return []byte(`<html>
+  <head>
+    <title>200 OK</title>
+  </head>
+  <body>
+    <h1>Success!</h1>
+    <p>Your request was an absolute banger.</p>
+  </body>
+</html>`)
+}
+
+func respone400() []byte {
+	return []byte(`<html>
+  <head>
+    <title>400 Bad Request</title>
+  </head>
+  <body>
+    <h1>Bad Request</h1>
+    <p>Your request honestly kinda sucked.</p>
+  </body>
+</html>`)
+}
+
+func respone500() []byte {
+	return []byte(`<html>
+  <head>
+    <title>500 Internal Server Error</title>
+  </head>
+  <body>
+    <h1>Internal Server Error</h1>
+    <p>Okay, you know what? This one is on me.</p>
+  </body>
+</html>`)
 }

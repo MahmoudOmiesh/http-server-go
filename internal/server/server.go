@@ -1,11 +1,11 @@
 package server
 
 import (
-	"bytes"
 	"fmt"
 	"http-server/internal/request"
 	"http-server/internal/response"
 	"io"
+	"log"
 	"net"
 	"sync/atomic"
 )
@@ -15,7 +15,7 @@ type HandlerError struct {
 	Message string
 }
 
-type Handler func(w io.Writer, req *request.Request) *HandlerError
+type Handler func(w *response.Writer, req *request.Request)
 
 type Server struct {
 	handler  Handler
@@ -60,12 +60,12 @@ func (s *Server) listen() {
 	for {
 		conn, err := s.listener.Accept()
 
-		if s.isClosed.Load() {
-			return
-		}
-
 		if err != nil {
-			return
+			if s.isClosed.Load() {
+				return
+			}
+			log.Printf("Error accepting connection: %v", err)
+			continue
 		}
 
 		go s.handle(conn)
@@ -78,23 +78,13 @@ func (s *Server) handle(conn net.Conn) {
 	request, err := request.RequestFromReader(conn)
 
 	if err != nil {
-		handlerError := MakeHandlerError(response.StatusBadRequest, "bad request\n")
+		handlerError := MakeHandlerError(response.StatusBadRequest, err.Error())
 		handlerError.write(conn)
 		return
 	}
 
-	buf := bytes.NewBuffer([]byte{})
-	handlerError := s.handler(buf, request)
-
-	if handlerError != nil {
-		handlerError.write(conn)
-		return
-	}
-
-	response.WriteStatusLine(conn, response.StatusOk)
-	headers := response.GetDefaultHeaders(buf.Len())
-	response.WriteHeaders(conn, headers)
-	response.WriteBody(conn, buf.Bytes())
+	responseWriter := response.NewWriter(conn)
+	s.handler(responseWriter, request)
 }
 
 func MakeHandlerError(code response.StatusCode, msg string) *HandlerError {
@@ -105,8 +95,10 @@ func MakeHandlerError(code response.StatusCode, msg string) *HandlerError {
 }
 
 func (h *HandlerError) write(w io.Writer) {
-	response.WriteStatusLine(w, h.Code)
+	responseWriter := response.NewWriter(w)
+
+	responseWriter.WriteStatusLine(h.Code)
 	headers := response.GetDefaultHeaders(len(h.Message))
-	response.WriteHeaders(w, headers)
-	response.WriteBody(w, []byte(h.Message))
+	responseWriter.WriteHeaders(headers)
+	responseWriter.WriteBody([]byte(h.Message))
 }

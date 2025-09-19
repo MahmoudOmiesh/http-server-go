@@ -8,11 +8,21 @@ import (
 
 type StatusCode int
 
+type Writer struct {
+	writer io.Writer
+}
+
 const (
 	StatusOk                  StatusCode = 200
 	StatusBadRequest          StatusCode = 400
 	StatusInternalServerError StatusCode = 500
 )
+
+func NewWriter(w io.Writer) *Writer {
+	return &Writer{
+		writer: w,
+	}
+}
 
 func getStatusLine(statusCode StatusCode) []byte {
 	switch statusCode {
@@ -27,10 +37,10 @@ func getStatusLine(statusCode StatusCode) []byte {
 	}
 }
 
-func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
+func (w *Writer) WriteStatusLine(statusCode StatusCode) error {
 	statusLine := getStatusLine(statusCode)
 
-	_, err := w.Write(statusLine)
+	_, err := w.writer.Write(statusLine)
 
 	if err != nil {
 		return err
@@ -49,7 +59,7 @@ func GetDefaultHeaders(contentLen int) headers.Headers {
 	return headers
 }
 
-func WriteHeaders(w io.Writer, headers headers.Headers) error {
+func (w *Writer) WriteHeaders(headers headers.Headers) error {
 	var foundErr error = nil
 
 	headers.ForEach(func(key, val string) {
@@ -57,12 +67,12 @@ func WriteHeaders(w io.Writer, headers headers.Headers) error {
 			return
 		}
 
-		_, err := fmt.Fprintf(w, "%s: %s\r\n", key, val)
+		_, err := fmt.Fprintf(w.writer, "%s: %s\r\n", key, val)
 
 		foundErr = err
 	})
 
-	_, err := fmt.Fprint(w, "\r\n")
+	_, err := fmt.Fprint(w.writer, "\r\n")
 
 	if err != nil {
 		foundErr = err
@@ -71,8 +81,6 @@ func WriteHeaders(w io.Writer, headers headers.Headers) error {
 	return foundErr
 }
 
-func WriteBody(w io.Writer, body []byte) error {
-	_, err := fmt.Fprint(w, string(body))
-
-	return err
+func (w *Writer) WriteBody(body []byte) (int, error) {
+	return fmt.Fprint(w.writer, string(body))
 }

@@ -9,7 +9,7 @@ import (
 	"unicode"
 )
 
-const bufferSize = 8
+const bufferSize = 2048
 
 var SEPARATOR = "\r\n"
 var ErrorInvalidRequest = errors.New("request is invalid")
