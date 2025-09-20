@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/sha256"
+	"fmt"
+	"http-server/internal/headers"
 	"http-server/internal/request"
 	"http-server/internal/response"
 	"http-server/internal/server"
@@ -44,9 +47,9 @@ func basicServer() (*server.Server, error) {
 		}
 
 		w.WriteStatusLine(response.StatusBadRequest)
-		headers := response.GetDefaultHeaders(len(msg))
-		headers.Replace("Content-Type", "text/html")
-		w.WriteHeaders(headers)
+		heads := response.GetDefaultHeaders(len(msg))
+		heads.Replace("Content-Type", "text/html")
+		w.WriteHeaders(heads)
 		w.WriteBody(msg)
 	})
 }
@@ -67,20 +70,23 @@ func proxyServer() (*server.Server, error) {
 		}
 
 		buf := make([]byte, 1024)
+		fullBody := []byte{}
 		defer res.Body.Close()
 
 		w.WriteStatusLine(response.StatusOk)
 
-		headers := response.GetDefaultHeaders(0)
-		headers.Delete("Content-Length")
-		headers.Set("Transfer-Encoding", "chunked")
-		w.WriteHeaders(headers)
+		heads := response.GetDefaultHeaders(0)
+		heads.Delete("Content-Length")
+		heads.Set("Transfer-Encoding", "chunked")
+		heads.Set("Trailer", "X-Content-SHA256,X-Content-Length")
+		w.WriteHeaders(heads)
 
 		for {
 			n, err := res.Body.Read(buf)
 
 			if n > 0 {
 				w.WriteChunkedBody(buf[:n])
+				fullBody = append(fullBody, buf[:n]...)
 			}
 
 			if err == io.EOF {
@@ -93,7 +99,12 @@ func proxyServer() (*server.Server, error) {
 			}
 		}
 
-		w.WriteChunkedBodyDone()
+		w.WriteChunkedBodyDone(true)
+		bodyHash := sha256.Sum256(fullBody)
+		trailers := headers.NewHeaders()
+		trailers.Set("X-Content-SHA256", fmt.Sprintf("%x", bodyHash))
+		trailers.Set("X-Content-Length", fmt.Sprintf("%d", len(fullBody)))
+		w.WriteTrailers(trailers)
 	})
 }
 

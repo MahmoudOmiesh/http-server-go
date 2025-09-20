@@ -86,6 +86,24 @@ func (w *Writer) WriteChunkedBody(body []byte) (int, error) {
 	return w.writer.Write(buf)
 }
 
-func (w *Writer) WriteChunkedBodyDone() (int, error) {
-	return w.writer.Write([]byte("0\r\n\r\n"))
+func (w *Writer) WriteChunkedBodyDone(hasTrailers bool) (int, error) {
+	if hasTrailers {
+		return w.writer.Write([]byte("0\r\n"))
+	} else {
+		return w.writer.Write([]byte("0\r\n\r\n"))
+	}
+}
+
+func (w *Writer) WriteTrailers(trailers headers.Headers) error {
+	buf := []byte{}
+
+	trailers.ForEach(func(key, val string) {
+		buf = fmt.Appendf(buf, "%s: %s\r\n", key, val)
+	})
+
+	buf = fmt.Append(buf, "\r\n")
+
+	_, err := w.writer.Write(buf)
+
+	return err
 }
