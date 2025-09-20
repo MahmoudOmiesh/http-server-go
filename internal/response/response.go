@@ -60,27 +60,32 @@ func GetDefaultHeaders(contentLen int) headers.Headers {
 }
 
 func (w *Writer) WriteHeaders(headers headers.Headers) error {
-	var foundErr error = nil
+	buf := []byte{}
 
 	headers.ForEach(func(key, val string) {
-		if foundErr != nil {
-			return
-		}
-
-		_, err := fmt.Fprintf(w.writer, "%s: %s\r\n", key, val)
-
-		foundErr = err
+		buf = fmt.Appendf(buf, "%s: %s\r\n", key, val)
 	})
 
-	_, err := fmt.Fprint(w.writer, "\r\n")
+	buf = fmt.Append(buf, "\r\n")
 
-	if err != nil {
-		foundErr = err
-	}
+	_, err := w.writer.Write(buf)
 
-	return foundErr
+	return err
 }
 
 func (w *Writer) WriteBody(body []byte) (int, error) {
-	return fmt.Fprint(w.writer, string(body))
+	return w.writer.Write(body)
+}
+
+func (w *Writer) WriteChunkedBody(body []byte) (int, error) {
+	buf := []byte{}
+
+	buf = fmt.Appendf(buf, "%X\r\n", len(body))
+	buf = fmt.Append(buf, string(body), "\r\n")
+
+	return w.writer.Write(buf)
+}
+
+func (w *Writer) WriteChunkedBodyDone() (int, error) {
+	return w.writer.Write([]byte("0\r\n\r\n"))
 }
